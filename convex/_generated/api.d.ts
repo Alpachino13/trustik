@@ -16,14 +16,18 @@ import type * as domain_deals from "../domain/deals.js";
 import type * as domain_deposits from "../domain/deposits.js";
 import type * as domain_disputes from "../domain/disputes.js";
 import type * as domain_fees from "../domain/fees.js";
+import type * as domain_kyc from "../domain/kyc.js";
 import type * as domain_ledger from "../domain/ledger.js";
+import type * as domain_withdrawals from "../domain/withdrawals.js";
 import type * as http from "../http.js";
+import type * as kyc from "../kyc.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_hmac from "../lib/hmac.js";
 import type * as lib_money from "../lib/money.js";
 import type * as services_emailCodes from "../services/emailCodes.js";
 import type * as wallet from "../wallet.js";
+import type * as withdrawals from "../withdrawals.js";
 
 import type {
   ApiFromModules,
@@ -40,14 +44,18 @@ declare const fullApi: ApiFromModules<{
   "domain/deposits": typeof domain_deposits;
   "domain/disputes": typeof domain_disputes;
   "domain/fees": typeof domain_fees;
+  "domain/kyc": typeof domain_kyc;
   "domain/ledger": typeof domain_ledger;
+  "domain/withdrawals": typeof domain_withdrawals;
   http: typeof http;
+  kyc: typeof kyc;
   "lib/auth": typeof lib_auth;
   "lib/errors": typeof lib_errors;
   "lib/hmac": typeof lib_hmac;
   "lib/money": typeof lib_money;
   "services/emailCodes": typeof services_emailCodes;
   wallet: typeof wallet;
+  withdrawals: typeof withdrawals;
 }>;
 
 /**

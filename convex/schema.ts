@@ -139,4 +139,34 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_checkout", ["providerCheckoutId"]),
+  
+  kycSubmissions: defineTable({
+    userId: v.id("users"),
+    fullName: v.string(),
+    documentType: v.union(
+      v.literal("national_id"),
+      v.literal("passport"),
+      v.literal("driver_license"),
+    ),
+    documentNumber: v.string(),
+    documentFileId: v.id("_storage"),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+    reviewedBy: v.optional(v.id("users")),
+    reviewNote: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"]),
+
+  withdrawals: defineTable({
+    userId: v.id("users"),
+    amount: v.number(), // centimes
+    method: v.union(v.literal("ccp"), v.literal("bank"), v.literal("baridimob")),
+    accountHolder: v.string(),
+    accountNumber: v.string(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+    reviewedBy: v.optional(v.id("users")),
+    reviewNote: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"]),
 });
