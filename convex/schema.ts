@@ -123,4 +123,20 @@ export default defineSchema({
     authorId: v.id("users"),
     body: v.string(),
   }).index("by_dispute", ["disputeId"]),
+
+  deposits: defineTable({
+    userId: v.id("users"),
+    amount: v.number(), // centimes
+    status: v.union(
+      v.literal("pending"),
+      v.literal("paid"),
+      v.literal("failed"),
+      v.literal("expired"),
+    ),
+    provider: v.literal("chargily"),
+    providerCheckoutId: v.optional(v.string()),
+    checkoutUrl: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_checkout", ["providerCheckoutId"]),
 });
