@@ -8,13 +8,18 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
+import type * as deals from "../deals.js";
 import type * as domain_dealMachine from "../domain/dealMachine.js";
 import type * as domain_deals from "../domain/deals.js";
 import type * as domain_disputes from "../domain/disputes.js";
 import type * as domain_fees from "../domain/fees.js";
 import type * as domain_ledger from "../domain/ledger.js";
+import type * as http from "../http.js";
+import type * as lib_auth from "../lib/auth.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_money from "../lib/money.js";
+import type * as wallet from "../wallet.js";
 
 import type {
   ApiFromModules,
@@ -23,13 +28,18 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
+  deals: typeof deals;
   "domain/dealMachine": typeof domain_dealMachine;
   "domain/deals": typeof domain_deals;
   "domain/disputes": typeof domain_disputes;
   "domain/fees": typeof domain_fees;
   "domain/ledger": typeof domain_ledger;
+  http: typeof http;
+  "lib/auth": typeof lib_auth;
   "lib/errors": typeof lib_errors;
   "lib/money": typeof lib_money;
+  wallet: typeof wallet;
 }>;
 
 /**

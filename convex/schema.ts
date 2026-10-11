@@ -1,3 +1,4 @@
+import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
@@ -24,6 +25,7 @@ export const dealStatus = v.union(
 );
 
 export default defineSchema({
+  ...authTables,
   users: defineTable({
     // fields Convex Auth expects (all optional)
     name: v.optional(v.string()),
