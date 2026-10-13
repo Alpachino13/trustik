@@ -30,9 +30,9 @@ type WithdrawalMethod = "ccp" | "bank" | "baridimob";
 export default function WalletPage() {
   const { t } = useTranslation();
   const wallet = useQuery(api.wallet.me);
-  const deals = useQuery(api.deals.mine);
   const kycQuery = useQuery(api.kyc.status);
   const withdrawalsQuery = useQuery(api.withdrawals.mine);
+  const escrow = useQuery(api.escrow.heldForMe);
   const history = usePaginatedQuery(api.wallet.history, {}, { initialNumItems: 15 });
   const requestWithdrawal = useMutation(api.withdrawals.request);
 
@@ -51,11 +51,8 @@ export default function WalletPage() {
   const availableCentimes = wallet?.balance ?? 0;
   const isKycApproved = kycQuery?.kycStatus === "approved";
 
-  // Calculate held funds in escrow from funded deals
-  const myDeals = deals ?? [];
-  const heldCentimes = myDeals
-    .filter((d) => d.status === "funded")
-    .reduce((sum, d) => sum + d.amount, 0);
+  // Funds the user has locked in escrow as a buyer (computed server-side)
+  const heldCentimes = escrow?.held ?? 0;
 
   async function handleWithdrawalSubmit(e: React.FormEvent) {
     e.preventDefault();

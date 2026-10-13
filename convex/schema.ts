@@ -24,6 +24,12 @@ export const dealStatus = v.union(
   v.literal("cancelled"),
 );
 
+export const listingCategory = v.union(
+  v.literal("electronics"), v.literal("vehicles"), v.literal("property"),
+  v.literal("services"), v.literal("fashion"), v.literal("home"),
+  v.literal("digital"), v.literal("other"),
+);
+
 export default defineSchema({
   ...authTables,
   users: defineTable({
@@ -169,4 +175,23 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
+
+  listings: defineTable({
+    creatorId: v.id("users"),
+    side: v.union(v.literal("selling"), v.literal("buying")),
+    title: v.string(),
+    description: v.string(),
+    category: listingCategory,
+    city: v.optional(v.string()),
+    amount: v.number(), // centimes, DZD only in v1
+    searchText: v.string(), // title + city, powers the free-text search
+    status: v.union(v.literal("open"), v.literal("accepted"), v.literal("removed")),
+    dealId: v.optional(v.id("deals")),
+  })
+    .index("by_status", ["status"])
+    .index("by_creator", ["creatorId", "status"])
+    .searchIndex("search_text", {
+      searchField: "searchText",
+      filterFields: ["status"],
+    }),
 });

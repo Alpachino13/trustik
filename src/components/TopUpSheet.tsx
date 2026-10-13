@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction } from "convex/react";
-import { ArrowRight, Check, X } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import { errorMessage } from "@/lib/format";
@@ -15,9 +15,9 @@ interface TopUpSheetProps {
 const CHIPS_USD = [50, 100, 150, 200];
 const CHIPS_DZD = [500, 1000, 2000, 5000];
 
-export function TopUpSheet({ open, onClose, currencyMode = "USD" }: TopUpSheetProps) {
+export function TopUpSheet({ open, onClose, currencyMode = "DZD" }: TopUpSheetProps) {
   const start = useAction(api.deposits.start);
-  const [amount, setAmount] = useState(150);
+  const [amount, setAmount] = useState(currencyMode === "USD" ? 150 : 1000);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,7 +72,7 @@ export function TopUpSheet({ open, onClose, currencyMode = "USD" }: TopUpSheetPr
         </div>
 
         <p className="text-center text-xs font-semibold text-muted mt-2">
-          Enter Amount from {currencySymbol}1.00 to {currencySymbol}500.00 for Quick Transfer
+          {currencyMode === "USD" ? "Enter Amount from $1.00 to $500.00 for Quick Transfer" : "Montant entre 100 et 500 000 DZD (cartes CIB / EDAHABIA)"}
         </p>
 
         {/* Big formatted amount field ($150.00) */}

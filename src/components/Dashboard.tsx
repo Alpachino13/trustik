@@ -2,18 +2,15 @@
 
 import { useConvexAuth, usePaginatedQuery, useQuery } from "convex/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Calendar,
-  ChevronRight,
-  Coffee,
   Laptop,
   ShoppingBag,
-  Sparkles,
   UtensilsCrossed,
 } from "lucide-react";
 import { api } from "../../convex/_generated/api";
-import { formatCentimes, formatDzd } from "@/lib/format";
+import { formatCentimes } from "@/lib/format";
 import { ACTIVE_STATUSES, DEAL_STATUS, LEDGER } from "@/lib/labels";
 import { BalanceCard } from "./BalanceCard";
 import { SpendingDonut } from "./SpendingDonut";
@@ -64,31 +61,12 @@ export function Dashboard() {
     { initialNumItems: 5 }
   );
   const [topUp, setTopUp] = useState(false);
-  const [banner, setBanner] = useState<string | null>(null);
-
-  useEffect(() => {
-    const result = new URLSearchParams(window.location.search).get("deposit");
-    if (result === "success")
-      setBanner("Paiement reçu. Votre solde se met à jour dès la confirmation.");
-    if (result === "failed")
-      setBanner("Le paiement a échoué ou a été annulé.");
-    if (result) window.history.replaceState(null, "", "/");
-  }, []);
 
   const allDeals = deals ?? [];
   const activeDeals = allDeals.filter((d) => ACTIVE_STATUSES.includes(d.status));
 
   return (
     <div className="space-y-6 animate-fadeIn pb-6">
-      {banner && (
-        <p
-          role="status"
-          className="rounded-2xl bg-tint-mint p-3 text-sm font-semibold text-mint-deep shadow-sm"
-        >
-          {banner}
-        </p>
-      )}
-
       {/* Screen 1 Balance Card */}
       <BalanceCard
         balance={wallet?.balance}
@@ -150,7 +128,7 @@ export function Dashboard() {
                       }`}
                     >
                       {credit ? "+" : "−"}
-                      {formatDzd(e.amount)}
+                      {formatCentimes(e.amount)}
                     </span>
                   </li>
                 );
