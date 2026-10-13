@@ -5,6 +5,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { AuthForm } from "@/components/AuthForm";
 import { Dashboard } from "@/components/Dashboard";
+import { Marketplace } from "@/components/Marketplace";
 
 export default function Home() {
   const [previewMode, setPreviewMode] = useState(false);
@@ -37,7 +38,7 @@ export default function Home() {
       </Unauthenticated>
       <Authenticated>
         <AppShell>
-          <Dashboard />
+          <Marketplace />
         </AppShell>
       </Authenticated>
     </>
