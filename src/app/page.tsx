@@ -1,15 +1,18 @@
 "use client";
 
 import { AppShell } from "@/components/AppShell";
-import { Search, Filter, Loader2 } from "lucide-react";
-import { useQuery } from "convex/react";
+import { Search, Filter, Loader2, ShieldCheck } from "lucide-react";
+import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import Link from "next/link";
 
 export default function MarketplacePage() {
-  const deals = useQuery(api.deals.mine);
+  // 1. On récupère l'état d'authentification
+  const { isAuthenticated, isLoading } = useConvexAuth();
 
-  // Fonction pour obtenir une image par défaut attrayante si le deal n'en a pas
+  // 2. On utilise "skip" pour ne pas exécuter la requête si l'utilisateur est déconnecté
+  const deals = useQuery(api.deals.mine, isAuthenticated ? undefined : "skip");
+
   const getFallbackImage = (title: string = "") => {
     const t = title.toLowerCase();
     if (t.includes("macbook") || t.includes("pc") || t.includes("ordinateur")) return "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=800&auto=format&fit=crop";
@@ -17,7 +20,6 @@ export default function MarketplacePage() {
     if (t.includes("instagram") || t.includes("compte") || t.includes("social")) return "https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=800&auto=format&fit=crop";
     if (t.includes("voiture") || t.includes("auto")) return "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=800&auto=format&fit=crop";
     
-    // Image générique (Poignée de main / Deal)
     return "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=800&auto=format&fit=crop";
   };
 
@@ -62,23 +64,39 @@ export default function MarketplacePage() {
           )}
         </div>
 
-        {/* Liste des Deals Réels */}
+        {/* Liste des Deals ou États de connexion */}
         <div className="space-y-5">
-          {deals === undefined ? (
+          {isLoading ? (
+            // Chargement de l'authentification
+            <div className="flex justify-center items-center py-10">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+          ) : !isAuthenticated ? (
+            // État déconnecté : Message et bouton pour se connecter
+            <div className="text-center py-12 px-4 bg-white rounded-[2rem] shadow-sm border border-slate-50 flex flex-col items-center gap-4">
+              <ShieldCheck className="w-12 h-12 text-blue-100 mb-2" />
+              <p className="text-slate-500 font-medium">Vous devez être connecté pour voir vos deals sécurisés.</p>
+              <Link href="/profile" className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-blue-700 transition-colors shadow-md shadow-blue-600/20 mt-2">
+                Se connecter
+              </Link>
+            </div>
+          ) : deals === undefined ? (
+            // Chargement des données Convex
             <div className="flex justify-center items-center py-10">
               <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
             </div>
           ) : deals.length === 0 ? (
+            // Aucun deal trouvé
             <div className="text-center py-10 text-slate-500 bg-white rounded-3xl border border-slate-50">
               Aucun deal disponible pour le moment.
             </div>
           ) : (
+            // Affichage des deals
             deals.map((deal) => (
               <div
                 key={deal._id}
                 className="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-50 flex flex-col gap-4 relative overflow-hidden group"
               >
-                {/* Zone Image du deal */}
                 <div className="w-full h-40 bg-slate-100 rounded-[1.5rem] overflow-hidden relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
