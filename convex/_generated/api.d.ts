@@ -30,7 +30,6 @@ import type * as lib_hmac from "../lib/hmac.js";
 import type * as lib_money from "../lib/money.js";
 import type * as listings from "../listings.js";
 import type * as services_emailCodes from "../services/emailCodes.js";
-import type * as users from "../users.js";
 import type * as wallet from "../wallet.js";
 import type * as withdrawals from "../withdrawals.js";
 
@@ -63,7 +62,6 @@ declare const fullApi: ApiFromModules<{
   "lib/money": typeof lib_money;
   listings: typeof listings;
   "services/emailCodes": typeof services_emailCodes;
-  users: typeof users;
   wallet: typeof wallet;
   withdrawals: typeof withdrawals;
 }>;

@@ -17,6 +17,9 @@ import { api } from "../../../convex/_generated/api";
 import { AppShell } from "@/components/AppShell";
 import { type Locale, useTranslation } from "@/lib/i18n/context";
 
+// Import du composant Dashboard
+import { Dashboard } from "@/components/Dashboard";
+
 export default function ProfilePage() {
   const { signOut } = useAuthActions();
   const { locale, setLocale, t } = useTranslation();
@@ -59,6 +62,11 @@ export default function ProfilePage() {
               {kycQuery?.kycStatus === "approved" ? "KYC Vérifié ✓" : "KYC Non vérifié"}
             </span>
           </div>
+        </div>
+
+        {/* Intégration du Dashboard (Balance + Transactions) */}
+        <div className="mt-2">
+          <Dashboard />
         </div>
 
         {/* Settings Links */}
