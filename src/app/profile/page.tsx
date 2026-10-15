@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
+import { useQuery, useConvexAuth } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
 import {
@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Globe,
   LogOut,
-  Phone,
   ShieldCheck,
   User,
 } from "lucide-react";
@@ -17,13 +16,22 @@ import { api } from "../../../convex/_generated/api";
 import { AppShell } from "@/components/AppShell";
 import { type Locale, useTranslation } from "@/lib/i18n/context";
 
-// Import du composant Dashboard
-import { Dashboard } from "@/components/Dashboard";
+// Imports pour la Balance et le Dashboard
+import { BalanceCard } from "@/components/BalanceCard";
+import { TopUpSheet } from "@/components/TopUpSheet";
 
 export default function ProfilePage() {
   const { signOut } = useAuthActions();
   const { locale, setLocale, t } = useTranslation();
-  const kycQuery = useQuery(api.kyc.status);
+  
+  // État d'authentification
+  const { isAuthenticated, isLoading } = useConvexAuth();
+
+  // Requête KYC ignorée si non connecté
+  const kycQuery = useQuery(api.kyc.status, isAuthenticated ? undefined : "skip");
+
+  // État pour le modal de rechargement depuis la BalanceCard
+  const [topUpOpen, setTopUpOpen] = useState(false);
 
   return (
     <AppShell>
@@ -45,72 +53,92 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* User Card */}
-        <div className="rounded-[2.5rem] bg-white p-6 shadow-card flex items-center gap-4">
-          <div className="flex size-16 items-center justify-center rounded-full bg-gradient-to-tr from-[#3552dc] to-[#637cf6] text-white shadow-md shadow-brand/25 text-xl font-black">
-            <User size={30} />
+        {/* Etats de chargement et d'authentification */}
+        {isLoading ? (
+          <div className="rounded-[2rem] bg-white p-8 text-center text-muted font-bold shadow-card">
+            {t.common.loading}
           </div>
-          <div className="space-y-1">
-            <p className="text-lg font-black text-ink">Utilisateur Trustik</p>
-            <span
-              className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
-                kycQuery?.kycStatus === "approved"
-                  ? "bg-tint-mint text-mint-deep"
-                  : "bg-tint-amber text-amber"
-              }`}
-            >
-              {kycQuery?.kycStatus === "approved" ? "KYC Vérifié ✓" : "KYC Non vérifié"}
-            </span>
+        ) : !isAuthenticated ? (
+          <div className="rounded-[2.5rem] bg-white p-8 text-center shadow-card space-y-4">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-tint-blue text-brand">
+              <ShieldCheck size={28} />
+            </div>
+            <p className="text-sm font-bold text-ink">
+              Vous devez être connecté pour accéder à votre profil et paramètres.
+            </p>
           </div>
-        </div>
-
-        {/* Intégration du Dashboard (Balance + Transactions) */}
-        <div className="mt-2">
-          <Dashboard />
-        </div>
-
-        {/* Settings Links */}
-        <div className="rounded-[2rem] bg-white p-4 shadow-card divide-y divide-gray-100">
-          {/* KYC link */}
-          <Link
-            href="/kyc"
-            className="flex items-center justify-between p-3 hover:bg-page rounded-2xl transition"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-tint-mint text-mint-deep">
-                <ShieldCheck size={20} />
+        ) : (
+          <>
+            {/* User Card */}
+            <div className="rounded-[2.5rem] bg-white p-6 shadow-card flex items-center gap-4">
+              <div className="flex size-16 items-center justify-center rounded-full bg-gradient-to-tr from-[#3552dc] to-[#637cf6] text-white shadow-md shadow-brand/25 text-xl font-black">
+                <User size={30} />
               </div>
-              <div>
-                <p className="text-sm font-extrabold text-ink">{t.nav.kyc}</p>
-                <p className="text-[11px] font-semibold text-muted">
-                  Requis avant le premier retrait
-                </p>
+              <div className="space-y-1">
+                <p className="text-lg font-black text-ink">Utilisateur Trustik</p>
+                <span
+                  className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
+                    kycQuery?.kycStatus === "approved"
+                      ? "bg-tint-mint text-mint-deep"
+                      : "bg-tint-amber text-amber"
+                  }`}
+                >
+                  {kycQuery?.kycStatus === "approved" ? "KYC Vérifié ✓" : "KYC Non vérifié"}
+                </span>
               </div>
             </div>
-            <ChevronRight size={18} className="text-muted" />
-          </Link>
 
-          {/* Admin panel link */}
-          <Link
-            href="/admin"
-            className="flex items-center justify-between p-3 hover:bg-page rounded-2xl transition"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-tint-blue text-brand">
-                <User size={20} />
-              </div>
-              <div>
-                <p className="text-sm font-extrabold text-ink">{t.nav.admin}</p>
-                <p className="text-[11px] font-semibold text-muted">
-                  Espace opérateur & modération
-                </p>
-              </div>
+            {/* Carte de Solde Dynamique (Graphique SVG) */}
+            <div className="mt-4">
+              <BalanceCard onTopUp={() => setTopUpOpen(true)} />
             </div>
-            <ChevronRight size={18} className="text-muted" />
-          </Link>
-        </div>
 
-        {/* Language selector */}
+
+
+            {/* Settings Links */}
+            <div className="rounded-[2rem] bg-white p-4 shadow-card divide-y divide-gray-100 mt-4">
+              {/* KYC link */}
+              <Link
+                href="/kyc"
+                className="flex items-center justify-between p-3 hover:bg-page rounded-2xl transition"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-tint-mint text-mint-deep">
+                    <ShieldCheck size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-extrabold text-ink">{t.nav.kyc}</p>
+                    <p className="text-[11px] font-semibold text-muted">
+                      Requis avant le premier retrait
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-muted" />
+              </Link>
+
+              {/* Admin panel link */}
+              <Link
+                href="/admin"
+                className="flex items-center justify-between p-3 hover:bg-page rounded-2xl transition"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-tint-blue text-brand">
+                    <User size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-extrabold text-ink">{t.nav.admin}</p>
+                    <p className="text-[11px] font-semibold text-muted">
+                      Espace opérateur & modération
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-muted" />
+              </Link>
+            </div>
+          </>
+        )}
+
+        {/* Language selector (Toujours accessible) */}
         <div className="rounded-[2rem] bg-white p-5 shadow-card space-y-3">
           <div className="flex items-center gap-2">
             <Globe size={18} className="text-brand" />
@@ -138,15 +166,20 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Logout */}
-        <button
-          onClick={() => void signOut()}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-50 py-4 text-xs font-black text-danger hover:bg-red-100 transition active:scale-95"
-        >
-          <LogOut size={16} />
-          <span>{t.common.logout}</span>
-        </button>
+        {/* Logout (Affiché si connecté) */}
+        {isAuthenticated && (
+          <button
+            onClick={() => void signOut()}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-50 py-4 text-xs font-black text-danger hover:bg-red-100 transition active:scale-95"
+          >
+            <LogOut size={16} />
+            <span>{t.common.logout}</span>
+          </button>
+        )}
       </div>
+
+      {/* Modal Recharger depuis le bouton + de la BalanceCard */}
+      <TopUpSheet open={topUpOpen} onClose={() => setTopUpOpen(false)} />
     </AppShell>
   );
 }

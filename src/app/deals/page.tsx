@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery, useConvexAuth } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft, ArrowUpRight, Handshake, Plus, ShieldCheck } from "lucide-react";
@@ -14,7 +14,10 @@ type FilterTab = "all" | "active" | "completed" | "cancelled";
 
 export default function DealsPage() {
   const { t } = useTranslation();
-  const deals = useQuery(api.deals.mine);
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  
+  // Conditionally skip the query if the user is not authenticated
+  const deals = useQuery(api.deals.mine, isAuthenticated ? undefined : "skip");
   const [filter, setFilter] = useState<FilterTab>("all");
 
   const all = deals ?? [];
@@ -77,10 +80,23 @@ export default function DealsPage() {
           ))}
         </div>
 
-        {/* Deals List */}
-        {deals === undefined ? (
+        {/* Deals List & Auth States */}
+        {isLoading || (isAuthenticated && deals === undefined) ? (
           <div className="rounded-[2rem] bg-white p-8 text-center text-muted font-bold shadow-card">
             {t.common.loading}
+          </div>
+        ) : !isAuthenticated ? (
+          <div className="rounded-[2rem] bg-white p-8 text-center shadow-card space-y-4">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-tint-blue text-brand">
+              <ShieldCheck size={28} />
+            </div>
+            <p className="text-sm font-bold text-ink">Vous devez être connecté pour voir vos deals.</p>
+            <Link
+              href="/profile"
+              className="inline-flex items-center gap-1.5 rounded-full bg-brand px-5 py-2.5 text-xs font-black text-white shadow-md shadow-brand/30 hover:brightness-105 transition"
+            >
+              <span>Se connecter</span>
+            </Link>
           </div>
         ) : filtered.length === 0 ? (
           <div className="rounded-[2rem] bg-white p-8 text-center shadow-card space-y-3">

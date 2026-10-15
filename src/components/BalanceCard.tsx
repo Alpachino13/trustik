@@ -1,65 +1,134 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowDownRight, ArrowUpRight, ChevronDown, Plus } from "lucide-react";
-import { formatCentimes, formatDzd } from "@/lib/format";
+import { useState, useEffect, useMemo } from "react";
+import { ArrowDownRight, ArrowUpRight, ChevronDown, Plus, ShieldCheck } from "lucide-react";
+import { formatCentimes } from "@/lib/format";
+import { useConvexAuth, usePaginatedQuery, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { ACTIVE_STATUSES } from "@/lib/labels";
 
 interface BalanceCardProps {
-  balance?: number;
-  activeDeals?: number;
-  pendingTopUps?: number;
-  onTopUp: () => void;
-  currencyMode?: "USD" | "DZD";
+  onTopUp?: () => void;
 }
 
-export function BalanceCard({
-  balance,
-  onTopUp,
-  currencyMode = "USD",
-}: BalanceCardProps) {
-  const [activePoint, setActivePoint] = useState<number | null>(3);
-  const [selectedMonth, setSelectedMonth] = useState("September");
+export function BalanceCard({ onTopUp }: BalanceCardProps) {
+  const { isAuthenticated } = useConvexAuth();
+
+  // --- 1. Récupération des données réelles ---
+  const wallet = useQuery(api.wallet.me, isAuthenticated ? undefined : "skip");
+  const deals = useQuery(api.deals.mine, isAuthenticated ? undefined : "skip");
+  const historyQuery = usePaginatedQuery(
+    api.wallet.history,
+    isAuthenticated ? {} : "skip",
+    { initialNumItems: 20 }
+  );
+
+  const [activePoint, setActivePoint] = useState<number | null>(null);
   const [isMonthOpen, setIsMonthOpen] = useState(false);
 
-  const months = ["July", "August", "September", "October"];
+  // --- 2. Calculs (Balance, Revenus, Dépenses, Séquestre) ---
+  const availableCentimes = wallet?.balance ?? 0;
+  const currentMonthName = new Date().toLocaleString("fr-DZ", { month: "long" });
+  
+  const allDeals = deals ?? [];
+  const activeDeals = allDeals.filter((d) => ACTIVE_STATUSES.includes(d.status));
 
-  // Display balance
-  const formattedBalance =
-    currencyMode === "USD"
-      ? "$8,720.76"
-      : balance !== undefined
-        ? formatCentimes(balance)
-        : "8,720.00 DZD";
+  const currentMonthStats = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    if (historyQuery.results) {
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      historyQuery.results.forEach((tx) => {
+        const txDate = new Date(tx._creationTime);
+        if (txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear) {
+          if (tx.direction === "credit") income += tx.amount;
+          else expense += tx.amount;
+        }
+      });
+    }
+    return { income, expense };
+  }, [historyQuery.results]);
 
-  // Data points for the spline wave chart
-  const points = [
-    { x: 15, y: 55, value: "$640.20", date: "02 Sep" },
-    { x: 55, y: 35, value: "$890.10", date: "08 Sep" },
-    { x: 105, y: 60, value: "$520.40", date: "15 Sep" },
-    { x: 155, y: 25, value: "$1,098.53", date: "21 Sep" }, // Highlighted point in mockup
-    { x: 205, y: 45, value: "$780.00", date: "25 Sep" },
-    { x: 255, y: 20, value: "$1,210.30", date: "28 Sep" },
-    { x: 295, y: 40, value: "$950.00", date: "30 Sep" },
-  ];
+  // --- 3. Génération dynamique de la courbe SVG ---
+  const { points, pathD, areaD } = useMemo(() => {
+    const results = historyQuery.results || [];
+    
+    // On prend les 7 dernières transactions, et on les inverse pour les avoir par ordre chronologique
+    const recentTxs = [...results].slice(0, 7).reverse();
+    
+    let pointsData = recentTxs.map((tx) => ({
+      date: new Date(tx._creationTime).toLocaleDateString("fr-DZ", { day: "2-digit", month: "short" }),
+      value: tx.balanceAfter ?? 0,
+      formattedValue: formatCentimes(tx.balanceAfter ?? 0),
+    }));
 
-  // SVG cubic curve path
-  const pathD =
-    "M 15 55 C 35 45, 40 35, 55 35 C 75 35, 85 60, 105 60 C 125 60, 135 25, 155 25 C 175 25, 185 45, 205 45 C 225 45, 235 20, 255 20 C 275 20, 285 40, 295 40";
-  const areaD = `${pathD} L 295 85 L 15 85 Z`;
+    // S'il n'y a pas assez de données, on crée une ligne plate avec le solde actuel
+    if (pointsData.length === 0) {
+      const today = new Date().toLocaleDateString("fr-DZ", { day: "2-digit", month: "short" });
+      pointsData = [
+        { date: today, value: availableCentimes, formattedValue: formatCentimes(availableCentimes) },
+        { date: today, value: availableCentimes, formattedValue: formatCentimes(availableCentimes) },
+      ];
+    } else if (pointsData.length === 1) {
+      pointsData.unshift({ ...pointsData[0] });
+    }
+
+    // Paramètres SVG
+    const startX = 15;
+    const endX = 295;
+    const drawableWidth = endX - startX;
+    const svgHeight = 85;
+    const paddingY = 20;
+    const drawableHeight = svgHeight - 2 * paddingY;
+
+    // Normalisation des hauteurs (Y)
+    const minVal = Math.min(...pointsData.map((d) => d.value));
+    const maxVal = Math.max(...pointsData.map((d) => d.value));
+    const range = maxVal - minVal || 1; // Évite la division par zéro
+
+    const calculatedPoints = pointsData.map((d, i) => {
+      const x = startX + (i / (pointsData.length - 1)) * drawableWidth;
+      const y = paddingY + drawableHeight - ((d.value - minVal) / range) * drawableHeight;
+      return { ...d, x, y };
+    });
+
+    // Génération de la courbe de Bézier (Spline)
+    let dPath = `M ${calculatedPoints[0].x} ${calculatedPoints[0].y}`;
+    for (let i = 0; i < calculatedPoints.length - 1; i++) {
+      const p0 = calculatedPoints[i];
+      const p1 = calculatedPoints[i + 1];
+      const xMid = (p0.x + p1.x) / 2;
+      dPath += ` C ${xMid} ${p0.y}, ${xMid} ${p1.y}, ${p1.x} ${p1.y}`;
+    }
+
+    return {
+      points: calculatedPoints,
+      pathD: dPath,
+      areaD: `${dPath} L ${endX} ${svgHeight} L ${startX} ${svgHeight} Z`,
+    };
+  }, [historyQuery.results, availableCentimes]);
+
+  // Initialiser le point actif sur la transaction la plus récente (à droite)
+  useEffect(() => {
+    if (points.length > 0) {
+      setActivePoint(points.length - 1);
+    }
+  }, [points.length]);
 
   return (
     <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#2f55ea] via-[#284be0] to-[#1c36b8] p-5 pb-5 text-white shadow-[0_12px_36px_-10px_rgba(43,75,230,0.45)]">
-      {/* Decorative gradient overlay */}
+      {/* Décoration lumineuse en fond */}
       <div className="pointer-events-none absolute -right-12 -top-12 size-48 rounded-full bg-white/10 blur-2xl" />
 
-      {/* Top row: Balance title & Filter Dropdowns */}
+      {/* En-tête : Solde & Filtre */}
       <div className="relative flex items-center justify-between">
         <div>
-          <span className="text-xs font-medium tracking-wide text-white/70">
-            Balance
+          <span className="text-xs font-bold uppercase tracking-wider text-white/70">
+            Solde Disponible
           </span>
           <h2 className="mt-0.5 text-3xl font-extrabold tracking-tight">
-            {formattedBalance}
+            {formatCentimes(availableCentimes)}
           </h2>
         </div>
 
@@ -67,45 +136,26 @@ export function BalanceCard({
           <div className="relative">
             <button
               onClick={() => setIsMonthOpen(!isMonthOpen)}
-              className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition hover:bg-white/20 active:scale-95"
+              className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition hover:bg-white/20 active:scale-95 capitalize"
             >
               <span>Total</span>
               <span className="text-white/60">•</span>
-              <span>{selectedMonth}</span>
+              <span>{currentMonthName}</span>
               <ChevronDown size={14} className="text-white/80" />
             </button>
-
-            {isMonthOpen && (
-              <div className="absolute right-0 top-9 z-20 w-32 rounded-xl bg-white py-1 shadow-xl">
-                {months.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => {
-                      setSelectedMonth(m);
-                      setIsMonthOpen(false);
-                    }}
-                    className={`block w-full px-3 py-1.5 text-left text-xs font-bold transition hover:bg-page ${
-                      selectedMonth === m ? "text-brand" : "text-ink"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
           <button
             onClick={onTopUp}
-            aria-label="Add Money"
-            className="flex size-8 items-center justify-center rounded-full bg-mint text-white shadow-md shadow-mint/40 transition hover:brightness-105 active:scale-95"
+            aria-label="Recharger"
+            className="flex size-8 items-center justify-center rounded-full bg-mint text-white shadow-md shadow-mint/40 transition hover:scale-105 active:scale-95"
           >
-            <Plus size={18} strokeWidth={2.5} />
+            <Plus size={18} strokeWidth={3} />
           </button>
         </div>
       </div>
 
-      {/* Spline Wave Chart */}
+      {/* Courbe SVG Dynamique */}
       <div className="relative my-3 h-28 w-full select-none">
         <svg
           viewBox="0 0 310 85"
@@ -128,10 +178,10 @@ export function BalanceCard({
             </filter>
           </defs>
 
-          {/* Area fill */}
+          {/* Remplissage sous la courbe */}
           <path d={areaD} fill="url(#chartGradient)" />
 
-          {/* Stroke path */}
+          {/* Ligne de la courbe */}
           <path
             d={pathD}
             fill="none"
@@ -141,7 +191,7 @@ export function BalanceCard({
             filter="url(#glow)"
           />
 
-          {/* Points */}
+          {/* Points interactifs */}
           {points.map((p, idx) => (
             <g
               key={idx}
@@ -170,17 +220,17 @@ export function BalanceCard({
           ))}
         </svg>
 
-        {/* Floating Tooltip matching mockup ($1,098.53) */}
-        {activePoint !== null && (
+        {/* Tooltip (Bulle d'information) au survol */}
+        {activePoint !== null && points[activePoint] && (
           <div
-            className="pointer-events-none absolute -translate-x-1/2 rounded-lg bg-white/95 px-2.5 py-1 text-center shadow-lg backdrop-blur-md transition-all duration-300"
+            className="pointer-events-none absolute -translate-x-1/2 rounded-lg bg-white/95 px-2.5 py-1 text-center shadow-lg backdrop-blur-md transition-all duration-300 z-10"
             style={{
               left: `${(points[activePoint].x / 310) * 100}%`,
               top: `${Math.max(0, (points[activePoint].y / 85) * 100 - 34)}%`,
             }}
           >
             <p className="text-[11px] font-extrabold text-ink leading-tight">
-              {points[activePoint].value}
+              {points[activePoint].formattedValue}
             </p>
             <p className="text-[9px] font-semibold text-muted leading-none">
               {points[activePoint].date}
@@ -189,38 +239,38 @@ export function BalanceCard({
         )}
       </div>
 
-      {/* Bottom Summary Pill: Income, Expense, Debt */}
+      {/* Résumé du bas : Revenus, Dépenses, Séquestre */}
       <div className="relative mt-2 grid grid-cols-3 divide-x divide-gray-100 rounded-2xl bg-white p-2.5 text-ink shadow-[0_6px_20px_rgba(0,0,0,0.06)]">
-        {/* Income */}
+        {/* Revenus */}
         <div className="flex flex-col items-center px-1">
-          <span className="text-[10px] font-semibold text-muted">Income</span>
-          <div className="mt-0.5 flex items-center gap-1 font-extrabold text-mint-deep text-xs sm:text-sm">
+          <span className="text-[10px] font-bold uppercase text-slate-400">Revenus</span>
+          <div className="mt-0.5 flex items-center gap-1 font-black text-mint-deep text-xs sm:text-sm">
             <span className="flex size-4 items-center justify-center rounded-full bg-mint/15 text-mint-deep">
               <ArrowUpRight size={11} strokeWidth={3} />
             </span>
-            <span>+$248</span>
+            <span>+{formatCentimes(currentMonthStats.income)}</span>
           </div>
         </div>
 
-        {/* Expense */}
+        {/* Dépenses */}
         <div className="flex flex-col items-center px-1">
-          <span className="text-[10px] font-semibold text-muted">Expense</span>
-          <div className="mt-0.5 flex items-center gap-1 font-extrabold text-danger text-xs sm:text-sm">
+          <span className="text-[10px] font-bold uppercase text-slate-400">Dépenses</span>
+          <div className="mt-0.5 flex items-center gap-1 font-black text-danger text-xs sm:text-sm">
             <span className="flex size-4 items-center justify-center rounded-full bg-red-100 text-danger">
               <ArrowDownRight size={11} strokeWidth={3} />
             </span>
-            <span>-$240</span>
+            <span>-{formatCentimes(currentMonthStats.expense)}</span>
           </div>
         </div>
 
-        {/* Debt */}
+        {/* Séquestre */}
         <div className="flex flex-col items-center px-1">
-          <span className="text-[10px] font-semibold text-muted">Debt</span>
-          <div className="mt-0.5 flex items-center gap-1 font-extrabold text-[#3b66f5] text-xs sm:text-sm">
-            <span className="flex size-4 items-center justify-center rounded-full bg-blue-100 text-[#3b66f5]">
-              <ArrowUpRight size={11} strokeWidth={3} />
+          <span className="text-[10px] font-bold uppercase text-slate-400">Séquestre</span>
+          <div className="mt-0.5 flex items-center gap-1 font-black text-brand text-xs sm:text-sm">
+            <span className="flex size-4 items-center justify-center rounded-full bg-blue-100 text-brand">
+              <ShieldCheck size={11} strokeWidth={3} />
             </span>
-            <span>$120</span>
+            <span>{activeDeals.length} Deal(s)</span>
           </div>
         </div>
       </div>
